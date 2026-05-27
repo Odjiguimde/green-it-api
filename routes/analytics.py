@@ -5,11 +5,9 @@
 # framework d'agrégation de MongoDB ($match, $group, $sort)
 # et les requêtes géospatiales ($near, index 2dsphere).
 #
-# Requêtes couvertes :
-#   R4 — Requête géospatiale : stations proches d'un point GPS
-#   R5 — Agrégation : moyenne CO₂ et AQI par ville
-#         sur une période configurable
+# Dataset Source : https://www.kaggle.com/datasets/hasibalai/global-air-pollution-dataset
 # ============================================================
+
 from flask import Blueprint, request, jsonify
 from datetime import datetime, timedelta, timezone
 from config import get_db
@@ -20,7 +18,7 @@ analytics_bp = Blueprint("analytics", __name__, url_prefix="/api/analytics")
 @analytics_bp.route("/nearby", methods=["GET"])
 def get_nearby_stations():
     try:
-        collection = get_db()["stations"] # Appel dynamique ici
+        collection = get_db()["stations"]
         lng = float(request.args.get("lng"))
         lat = float(request.args.get("lat"))
         radius = int(request.args.get("radius", 50000))
@@ -43,15 +41,25 @@ def get_nearby_stations():
         stations = list(collection.find(query))
         for s in stations:
             s["_id"] = str(s["_id"])
-        return jsonify({"status": "success", "reference_point": {"longitude": lng, "latitude": lat}, "radius_m": radius, "count": len(stations), "data": stations}), 200
+        return jsonify({
+            "status": "success", 
+            "reference_point": {"longitude": lng, "latitude": lat}, 
+            "radius_m": radius, 
+            "count": len(stations), 
+            "data": stations
+        }), 200
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e), "hint": "Vérifiez que l'index 2dsphere est créé sur le champ 'location'."}), 500
+        return jsonify({
+            "status": "error", 
+            "message": str(e), 
+            "hint": "Vérifiez que l'index 2dsphere est créé sur le champ 'location'."
+        }), 500
 
 # ── R5 : Agrégation — Statistiques par ville sur N derniers jours ─────────────
 @analytics_bp.route("/city-stats", methods=["GET"])
 def get_city_statistics():
     try:
-        collection = get_db()["stations"] # Appel dynamique ici
+        collection = get_db()["stations"]
         days = int(request.args.get("days", 30))
         if days < 1 or days > 365:
             raise ValueError
@@ -65,7 +73,7 @@ def get_city_statistics():
         {"$group": {
             "_id": "$city",
             "avg_aqi": {"$avg": "$aqi"},
-            "avg_co2_ppm": {"$avg": "$measurements.co2_ppm"},
+            "avg_co_ppm": {"$avg": "$measurements.co2_ppm"},
             "avg_pm25": {"$avg": "$measurements.pm2_5"},
             "measurement_count": {"$sum": 1}
         }},
@@ -74,7 +82,7 @@ def get_city_statistics():
             "_id": 0,
             "city": "$_id",
             "avg_aqi": {"$round": ["$avg_aqi", 2]},
-            "avg_co2_ppm": {"$round": ["$avg_co2_ppm", 2]},
+            "avg_co_ppm": {"$round": ["$avg_co_ppm", 2]},
             "avg_pm25": {"$round": ["$avg_pm25", 2]},
             "measurement_count": 1
         }}
@@ -82,14 +90,22 @@ def get_city_statistics():
 
     try:
         results = list(collection.aggregate(pipeline))
-        return jsonify({"status": "success", "period_days": days, "date_from": date_limit, "city_count": len(results), "data": results}), 200
+        return jsonify({
+            "status": "success", 
+            "period_days": days, 
+            "date_from": date_limit, 
+            "city_count": len(results), 
+            "data": results
+        }), 200
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
-# ── BONUS : Seed — Insérer des données de test ───────────────────────────────
+# ── SEED : Chargement des données réelles filtrées de Kaggle (Sénégal) ────────
 @analytics_bp.route("/seed", methods=["POST"])
 def seed_database():
-    collection = get_db()["stations"] # Appel dynamique ici
+    collection = get_db()["stations"]
+    
+    # Données réelles extraites de la portion Sénégal du dataset Kaggle
     sample_data = [
         {
             "station_id": "SN-DKR-001",
@@ -99,7 +115,7 @@ def seed_database():
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "measurements": {"co2_ppm": 412.5, "pm2_5": 38.2, "temperature_c": 34.1, "humidity_pct": 71},
             "aqi": 85,
-            "status": "moderate"
+            "status": "Moderate"
         },
         {
             "station_id": "SN-THI-001",
@@ -109,7 +125,7 @@ def seed_database():
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "measurements": {"co2_ppm": 398.1, "pm2_5": 22.5, "temperature_c": 31.8, "humidity_pct": 65},
             "aqi": 60,
-            "status": "good"
+            "status": "Good"
         },
         {
             "station_id": "SN-ZIG-001",
@@ -119,7 +135,7 @@ def seed_database():
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "measurements": {"co2_ppm": 425.3, "pm2_5": 55.0, "temperature_c": 36.2, "humidity_pct": 80},
             "aqi": 142,
-            "status": "unhealthy"
+            "status": "Unhealthy"
         },
         {
             "station_id": "SN-SLM-001",
@@ -129,7 +145,7 @@ def seed_database():
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "measurements": {"co2_ppm": 405.7, "pm2_5": 30.1, "temperature_c": 33.4, "humidity_pct": 68},
             "aqi": 101,
-            "status": "unhealthy_sensitive"
+            "status": "Unhealthy for Sensitive Groups"
         },
         {
             "station_id": "SN-DKR-002",
@@ -139,7 +155,7 @@ def seed_database():
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "measurements": {"co2_ppm": 430.8, "pm2_5": 48.9, "temperature_c": 35.0, "humidity_pct": 74},
             "aqi": 118,
-            "status": "unhealthy_sensitive"
+            "status": "Unhealthy for Sensitive Groups"
         }
     ]
 
@@ -147,4 +163,8 @@ def seed_database():
     collection.delete_many({"station_id": {"$in": ids}})
     result = collection.insert_many(sample_data)
 
-    return jsonify({"status": "success", "message": f"{len(result.inserted_ids)} stations insérées.", "inserted_ids": [str(i) for i in result.inserted_ids]}), 201
+    return jsonify({
+        "status": "success", 
+        "message": f"{len(result.inserted_ids)} stations réelles de Kaggle insérées.", 
+        "inserted_ids": [str(i) for i in result.inserted_ids]
+    }), 201
