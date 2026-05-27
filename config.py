@@ -48,7 +48,7 @@ def get_db():
 
         return client[db_name]
 
-    except ConnectionFailure as e:
-        raise ConnectionFailure(
-            f"[✗] Impossible de se connecter à MongoDB Atlas : {e}"
-        )
+    except Exception as e:
+        # ICI : On affiche l'erreur réelle dans les logs de Render pour comprendre le problème !
+        print(f"[✗] ERREUR CRUCIALE MONGODB : {str(e)}")
+        raise e
