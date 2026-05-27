@@ -73,7 +73,7 @@ def get_city_statistics():
         {"$group": {
             "_id": "$city",
             "avg_aqi": {"$avg": "$aqi"},
-            "avg_co_ppm": {"$avg": "$measurements.co2_ppm"},
+            "avg_co2_ppm": {"$avg": "$measurements.co2_ppm"},
             "avg_pm25": {"$avg": "$measurements.pm2_5"},
             "measurement_count": {"$sum": 1}
         }},
@@ -82,7 +82,7 @@ def get_city_statistics():
             "_id": 0,
             "city": "$_id",
             "avg_aqi": {"$round": ["$avg_aqi", 2]},
-            "avg_co_ppm": {"$round": ["$avg_co_ppm", 2]},
+            "avg_co2_ppm": {"$round": ["$avg_co2_ppm", 2]},
             "avg_pm25": {"$round": ["$avg_pm25", 2]},
             "measurement_count": 1
         }}
